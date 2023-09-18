@@ -2,6 +2,20 @@
 import sys
 import os
 import re
+import pandas as pd
+import numpy as np
+import math
+
+def trackPercent(place,totalLength,strLen): #percent output tracker
+    percent = place/totalLength*100
+    string="{:.2f} % complete".format(percent)
+    sys.stdout.write("\r") #this "moves the cursor" to the beginning of the I0 line
+    sys.stdout.write(" "*strLen) #this "clears" whatever was on the line last time by writing whitespace
+    sys.stdout.write("\r") #move the cursor back to the start again
+    sys.stdout.write(string) #display the current percent we are at
+    sys.stdout.flush() #flush finishes call to print() (this is like what's under the hood of print function)
+    strLen=len(string) #return the new string length for next function call
+    return strLen
 
 SQL_query_QSO = """SELECT TOP {0}
 s.specObjID, s.class, s.z as redshift, s.zErr as redshiftError, s.spectroSynFluxIvar_u, s.spectroSynFluxIvar_g, s.spectroSynFluxIvar_r, s.spectroSynFluxIvar_z, s.spectroSynFluxIvar_i, s.spectroSynFlux_i, s.spectroSynFlux_z, s.spectroSynFlux_u, s.spectroSynFlux_g, s.plate, s.mjd, s.fiberid, s.run2d, p.objid, p.ra, p.dec, p.u, p.g, p.r, p.i, p.z, p.fieldID, p.err_u, p.err_g, p.err_r, p.err_i, p.err_z, p.petroRad_u, p.petroRad_g, p.petroRad_r, p.petroRad_i, p.petroRad_z, p.petroRadErr_u, p.petroRadErr_g, p.petroRadErr_r, p.petroRadErr_z, p.petroRadErr_i
@@ -85,7 +99,82 @@ def getID(row,fname):
         colNames = lines[1].split(",")
     return dict(zip(colNames,d))
 
+def getDF(CSVList):
+    """Retrieve pandas dataframe from list of CSV files
+    params: CSVList [list] - list of CSV files
+    returns: df [pandas dataframe] - dataframe of CSV files, assumes they share columnns
+    """
+    dfList = [pd.read_csv(CSVList[i],header=1) for i in range(len(CSVList))]
+    df = pd.concat(dfList)
+    return df
 
+def clean(CSVList,save=True):
+    print("getting combined dataframe")
+    combined_df = getDF(CSVList)
+    mask = (combined_df["u"] > 0) & (combined_df["g"] > 0) & (combined_df["r"] > 0) & (combined_df["i"] > 0) & (combined_df["z"] > 0) & (combined_df["err_u"] > 0) & (combined_df["err_g"] > 0) & (combined_df["err_r"] > 0) & (combined_df["err_i"] > 0) & (combined_df["err_z"] > 0) & (combined_df["redshiftError"] > 0)
+    combined_df = combined_df[mask]
+    df_noSize = combined_df.drop(columns=["petroRad_u","petroRad_g","petroRad_r","petroRad_i","petroRad_z","petroRadErr_u","petroRadErr_g","petroRadErr_r","petroRadErr_i","petroRadErr_z"]) #create a new dataframe without size information
+    if save:
+        df_noSize.to_csv("combined_noSize.csv",index=False) #save the resulting dataframe to a new CSV file
+        print("saved combined_noSize.csv")
+    else:
+        print("obtained noSize dataframe, starting size cleaning")
+    #clean size columns
+    df_wSize = combined_df.copy() #create a copy of the dataframe to clean the size columns
+    strLen = 0
+    cols2Check = ["petroRadErr_u","petroRadErr_g","petroRadErr_r","petroRadErr_i","petroRadErr_z"] #need at least one to have an error
+    mask = df_wSize[cols2Check] < 0
+    errCounts = np.sum(mask,axis=1)
+    inds2Check = np.where((errCounts <= 2) & (errCounts > 0))[0] #get the indices of the rows with size errors in less than 2 bands
+    discard = np.where(errCounts > 2)[0] #throw away rows with errors in more than 2 bands
+    for i in inds2Check: #note that this takes a long time to run...probably a more efficient way but only needs to be done once!
+        mags = df_wSize.iloc[i][["u","g","r","i","z"]] #magnitudes in each band
+        total = sum(mags)
+        badBands = [j for j in range(len(cols2Check)) if mask.iloc[i][j]]
+        badMags = [mags[j] for j in badBands]
+        badTotal = sum(badMags)
+        if badTotal/total < 0.1: #if the object is not bright in the bands with the size errors, replace the size errors with 0
+            colNames = ["petroRad_u","petroRad_g","petroRad_r","petroRad_i","petroRad_z"]
+            toReplace = [colNames[j] for j in badBands]
+            df_wSize.iloc[i][[toReplace]] = 0.0
+            toReplace = [cols2Check[j] for j in badBands]
+            df_wSize.iloc[i][[toReplace]] = 0.0 #set the error also to "zero" to indicate that we replaced this size
+        else: #otherwise throw out the row
+            np.append(discard,i)
+        strLen = trackPercent(i,df_wSize.shape[0],strLen)
+    toDrop = df_wSize.iloc[discard]
+    df_wSize.drop(toDrop.index,inplace=True)
+    if save:
+        df_wSize.to_csv("combined_wSize.csv",index=False) #save the resulting dataframe to a new CSV file
+        print("saved combined_wSize.csv")
+    else:
+        return df_noSize,df_wSize
+
+def visualizeDF(df,cols2Plot,x,nc=3):
+    """Visualize dataframe as boxplot
+    params: df [pandas dataframe] - dataframe to visualize
+            cols2Plot [list] - list of columns to plot
+            x - x variable for box plot
+            nc [int] - number of columns to plot per row
+    returns: fig,ax [matplotlib figure, axis] - figure and axis of plot
+    """
+    Nc = len(cols2Plot)
+    nr = int(np.ceil(Nc/nc)) #number of rows needed to plot all data columns with nc columns per row
+
+    fig, axs = plt.subplots(nr, nc, figsize=(16*(nc/nr),12*(nr/nc)),constrained_layout=True)
+
+    for i, column in enumerate(cols2Plot):
+        ax = axs.flatten()[i]
+        try:
+            sns.boxplot(x=x, y=df[column], ax=ax)
+            ax.set_title(column)
+            ax.set_ylabel(column)
+            ax.set_xlabel('') 
+        except:
+            "error at column {0}".format(column)
+    for i in range(nr*nc-Nc):
+        fig.delaxes(axs.flatten()[-(1+i)]) #delete extra axes
+    return fig,axs
 
 
 
