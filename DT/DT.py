@@ -15,6 +15,11 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 pd.options.mode.chained_assignment = None
 
+font = {'family' : 'DejaVu Serif',
+    'weight' : 'normal',
+    'size'   : 16}
+plt.rc('font', **font) #set all plot attribute defaults
+
 def trackPercent(place,totalLength,strLen): #percent output tracker
     percent = place/totalLength*100
     string="{:.2f} % complete".format(percent)
@@ -59,13 +64,15 @@ def genDTDataSDSS(cleanFile="../SDSS/combined_noSize_cleaned.csv"):
     out = "DTSDSS_noSizeData.csv" if "noSize" in cleanFile else "DTSDSS_wSizeData.csv"
     df.to_csv(out,index=False)
 
-def genResults(DTfile = "DTMCMCData.csv",testSize=0.3,forest=False,maxDepth=3):
+def genResults(DTfile = "DTMCMCData.csv",testSize=0.3,forest=False,maxDepth=3,extraDrop=[]):
     df = pd.read_csv(DTfile)
     if "MCMC" in DTfile:
-        X = df.drop(columns=["label"])
+        cols2drop = ["label"] + extraDrop
+        X = df.drop(columns=cols2drop)
         Y = df["label"]
     else:
-        X = df.drop(columns=["class"])
+        cols2drop = ["class"] + extraDrop
+        X = df.drop(columns=cols2drop)
         Y = df["class"]
     Xtrain,Xtest,Ytrain,Ytest = train_test_split(X,Y,test_size=testSize)
     if forest:
