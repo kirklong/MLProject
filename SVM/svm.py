@@ -98,3 +98,44 @@ def kernelSweep(fileList = ["SVMMCMCData.csv","SVMSDSS_wSizeData.csv","SVMSDSS_n
     fig.savefig("kernelSweep.png",dpi=300)
     df.to_csv("kernelSweep.csv",index=False)
     return fig,ax,df
+
+def groupedBarVis(df):
+    fig,ax = plt.subplots(1,1,figsize=(14,10))
+    xlabels = np.unique(df.kernel)
+    x = np.arange(len(xlabels))
+    width = 0.3
+    for i in range(len(xlabels)):
+        measurements = np.array(df[df.kernel == xlabels[i]].score*100)
+        measurements = [measurements[0],measurements[2],measurements[1]] #swap no/with sizes to match line plot
+        labels = ["DiskWind","SDSS (no sizes)","SDSS (with sizes)"] if i == 0 else None
+        colors = ["dodgerblue","crimson","grey"]
+        offsets = [width*i for i in range(len(measurements))]
+        bars = ax.bar(x[i]+offsets,measurements,width,label=labels,color=colors,zorder=10)
+        ax.bar_label(bars,padding=3,fmt="%.1f")
+    l = ax.legend()
+    l.set_title("Dataset")
+    l.get_frame().set_edgecolor('none')
+    ax.set_xticks(x+width,xlabels)
+    ax.set_xlabel("Kernel")
+    ax.set_ylabel("Accuracy [% correct]")
+    ax.tick_params(axis='y',which='minor',bottom=False)
+    ax.set_ylim(0,105); ax.set_xlim(0-width,np.max(x)+3*width)
+    ax.set_yticks(np.arange(0,110,10),["{}".format(i) for i in np.arange(0,110,10)],minor=False)
+    ax.set_yticks(np.arange(0,100,2.5),["" for i in np.arange(0,100,2.5)],minor=True)
+    ax.yaxis.grid(True,which='minor',color='k',alpha=0.05,zorder=0)
+    ax.yaxis.grid(True,which='major',color='k',alpha=0.15,zorder=0)
+    ax.set_title("SVM Accuracy (C=1.0, gamma=auto, degree=3)")
+    return fig,ax
+
+def redshiftRegression(dataFile="SVMSDSS_wSizeData.csv",testSize=0.3,extraDrop=["spectroSynFlux_i","spectroSynFlux_z","spectroSynFlux_u","spectroSynFlux_g"],C=1.0,maxIter=1000,tol=1e-5,eps=0.0):
+    df = pd.read_csv(dataFile)
+    cols2drop = ["class"] + ["redshift"] + extraDrop #extraDrop by default drops the spectroSynFlux columns
+    X = df.drop(columns=cols2drop)
+    Y = df["redshift"]
+    Xtrain,Xtest,Ytrain,Ytest = train_test_split(X,Y,test_size=testSize)
+    clf = make_pipeline(StandardScaler(), svm.LinearSVR(C=C,dual="auto",max_iter=maxIter,tol=tol,epsilon=eps)) #use LinearSVR as it is better suited for large datasets
+    #note to use other kernels do svm.SVR(kernel=kernel,C=C,gamma=gamma,cache_size=cache_size,degree=degree,etc) -- this takes several hours to complete while the above runs in ~1 minute
+    clf.fit(Xtrain,Ytrain)
+    Ypred = clf.predict(Xtest)
+    score = clf.score(Xtest,Ytest)
+    return [Xtrain,Xtest,Ytrain,Ytest],Ypred,score
