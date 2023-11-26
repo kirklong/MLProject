@@ -62,6 +62,7 @@ def genPlot(Ytest,Ypred,accuracy,save=False):
 
 def CParamSweep(fileList = ["SVMMCMCData.csv","SVMSDSS_wSizeData.csv","SVMSDSS_noSizeData.csv"],Clist = [0.1,0.5,1.,2.,3.,4.,5.],kernel="rbf",degree=3,gamma="auto",cache_size=1000,testSize=0.3,extraDrop=[]):
     fig,ax = plt.subplots(1,1,figsize=(12,10))
+    #note that this takes a few hours to run with default options on full datasets
     rows = []
     for file in fileList:
         print("Working on {}".format(file))
@@ -81,6 +82,7 @@ def CParamSweep(fileList = ["SVMMCMCData.csv","SVMSDSS_wSizeData.csv","SVMSDSS_n
 
 def kernelSweep(fileList = ["SVMMCMCData.csv","SVMSDSS_wSizeData.csv","SVMSDSS_noSizeData.csv"],kernels = ["rbf","linear","poly","sigmoid"],
                 degree=3,gamma="auto",C=1.,cache_size=1000,testSize=0.3,extraDrop=[]):
+    #note this takes a *long* time to run (roughly a day with default options, the sigmoid kernel is the worst offender)
     rows = []
     for file in fileList:
         print("Working on {}".format(file))
