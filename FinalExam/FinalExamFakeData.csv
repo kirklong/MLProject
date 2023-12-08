@@ -1,0 +1,31 @@
+Credit worthiness,Top item (excluding searched item) bought by users with similar search,Most recent search,Most recent purchase
+8,controller,switch,controller
+3,game,PS5,PS5
+4,game,xbox,xbox
+9,tv,soundbar,tv
+5,game,PS5,tv
+3,home theater,blu-ray,blu-ray
+7,switch,controller,switch
+5,game,PS5,None
+4,soundbar,tv,xbox
+4,switch,controller,None
+5,switch,controller,None
+4,controller,switch,switch
+6,game,PS5,None
+3,switch,controller,game
+6,tv,home theater,home theater
+7,game,xbox,controller
+2,tv,soundbar,soundbar
+2,controller,switch,xbox
+5,tv,home theater,soundbar
+8,xbox,game,blu-ray
+6,controller,switch,switch
+4,home theater,blu-ray,blu-ray
+6,game,xbox,soundbar
+4,switch,controller,None
+5,controller,switch,None
+4,soundbar,tv,tv
+5,xbox,controller,controller
+5,soundbar,tv,tv
+3,switch,controller,PS5
+5,tv,soundbar,None
